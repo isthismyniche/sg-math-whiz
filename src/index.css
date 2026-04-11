@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  /* Palette — deep, confident, Singaporean */
+  --color-bg-primary: #0A0F1C;
+  --color-bg-secondary: #141B2D;
+  --color-bg-card: #1C2438;
+  --color-accent-red: #E63946;
+  --color-accent-amber: #F4A261;
+  --color-text-primary: #F1FAEE;
+  --color-text-secondary: #A8B2C1;
+  --color-success: #2DC653;
+  --color-error: #E63946;
+  --color-streak: #F4A261;
+
+  /* Typography */
+  --font-display: "Instrument Serif", serif;
+  --font-body: "DM Sans", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+/* Base styles */
+body {
+  margin: 0;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
