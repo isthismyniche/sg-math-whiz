@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './hooks/useAuth'
 import { NicknameModal } from './components/NicknameModal'
 import { HomePage } from './pages/HomePage'
+import { ChallengePage } from './pages/ChallengePage'
 
 function Placeholder({ name }: { name: string }) {
   return (
@@ -30,8 +31,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route path="/challenge" element={<Placeholder name="Today's Challenge" />} />
-      <Route path="/result" element={<Placeholder name="Result" />} />
+      <Route path="/challenge" element={<ChallengePage />} />
       <Route path="/solution/:id" element={<Placeholder name="Solution" />} />
       <Route path="/leaderboard" element={<Placeholder name="Leaderboard" />} />
     </Routes>
