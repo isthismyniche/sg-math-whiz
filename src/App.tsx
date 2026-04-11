@@ -5,14 +5,7 @@ import { NicknameModal } from './components/NicknameModal'
 import { HomePage } from './pages/HomePage'
 import { ChallengePage } from './pages/ChallengePage'
 import { SolutionPage } from './pages/SolutionPage'
-
-function Placeholder({ name }: { name: string }) {
-  return (
-    <div className="flex-1 flex items-center justify-center font-display text-3xl text-text-primary">
-      {name}
-    </div>
-  )
-}
+import { LeaderboardPage } from './pages/LeaderboardPage'
 
 function AppRoutes() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -34,7 +27,7 @@ function AppRoutes() {
       <Route path="/" element={<HomePage />} />
       <Route path="/challenge" element={<ChallengePage />} />
       <Route path="/solution/:id" element={<SolutionPage />} />
-      <Route path="/leaderboard" element={<Placeholder name="Leaderboard" />} />
+      <Route path="/leaderboard" element={<LeaderboardPage />} />
     </Routes>
   )
 }
