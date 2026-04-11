@@ -4,6 +4,7 @@ import { useAuth } from './hooks/useAuth'
 import { NicknameModal } from './components/NicknameModal'
 import { HomePage } from './pages/HomePage'
 import { ChallengePage } from './pages/ChallengePage'
+import { SolutionPage } from './pages/SolutionPage'
 
 function Placeholder({ name }: { name: string }) {
   return (
@@ -32,7 +33,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/challenge" element={<ChallengePage />} />
-      <Route path="/solution/:id" element={<Placeholder name="Solution" />} />
+      <Route path="/solution/:id" element={<SolutionPage />} />
       <Route path="/leaderboard" element={<Placeholder name="Leaderboard" />} />
     </Routes>
   )
