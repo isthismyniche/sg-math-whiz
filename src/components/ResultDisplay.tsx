@@ -1,14 +1,16 @@
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
+import { CheckCircle, XCircle, Flame, ChevronRight } from 'lucide-react'
 import { formatTime } from '../hooks/useTimer'
 import type { SubmitResponse } from '../types'
 
 interface ResultDisplayProps {
   result: SubmitResponse
   questionId: string
+  submittedAnswer?: number
 }
 
-export function ResultDisplay({ result, questionId }: ResultDisplayProps) {
+export function ResultDisplay({ result, questionId, submittedAnswer }: ResultDisplayProps) {
   const navigate = useNavigate()
 
   return (
@@ -20,8 +22,18 @@ export function ResultDisplay({ result, questionId }: ResultDisplayProps) {
         transition={{ type: 'spring', stiffness: 300, damping: 15 }}
         className="text-center"
       >
-        <div className="text-7xl mb-4">
-          {result.isCorrect ? '🎉' : '😔'}
+        <div className="flex justify-center mb-4">
+          {result.isCorrect ? (
+            <motion.div
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
+            >
+              <CheckCircle className="w-20 h-20 text-success" strokeWidth={1.5} />
+            </motion.div>
+          ) : (
+            <XCircle className="w-20 h-20 text-error" strokeWidth={1.5} />
+          )}
         </div>
         <h2 className="font-display text-3xl text-text-primary mb-2">
           {result.isCorrect ? 'Correct!' : 'Not quite...'}
@@ -53,7 +65,7 @@ export function ResultDisplay({ result, questionId }: ResultDisplayProps) {
           </div>
         </div>
 
-        {/* Rank (if correct) or Correct Answer */}
+        {/* Rank (if correct) or Your Answer (if wrong) */}
         {result.isCorrect && result.rank !== undefined ? (
           <div className="bg-bg-card rounded-xl p-4 text-center">
             <div className="text-text-secondary text-xs uppercase tracking-wider mb-1">
@@ -68,8 +80,8 @@ export function ResultDisplay({ result, questionId }: ResultDisplayProps) {
             <div className="text-text-secondary text-xs uppercase tracking-wider mb-1">
               Your Answer
             </div>
-            <div className="font-mono text-lg font-bold text-error">
-              {result.correctAnswer !== undefined ? '—' : ''}
+            <div className="font-mono text-lg font-bold text-error line-through">
+              {submittedAnswer ?? '—'}
             </div>
           </div>
         )}
@@ -82,7 +94,7 @@ export function ResultDisplay({ result, questionId }: ResultDisplayProps) {
         transition={{ delay: 0.4, duration: 0.4 }}
         className="bg-bg-card rounded-xl p-4 flex items-center justify-center gap-3"
       >
-        <span className="text-2xl">🔥</span>
+        <Flame className="w-5 h-5 text-streak" />
         <span className="text-text-secondary text-sm">Streak:</span>
         <span className="font-mono text-xl font-bold text-streak">
           {result.currentStreak}
@@ -101,9 +113,10 @@ export function ResultDisplay({ result, questionId }: ResultDisplayProps) {
       >
         <button
           onClick={() => navigate(`/solution/${questionId}`)}
-          className="w-full rounded-xl bg-accent-red py-3.5 px-4 font-body font-semibold text-text-primary transition-all hover:brightness-110 active:scale-[0.98]"
+          className="w-full rounded-xl bg-accent-red py-3.5 px-4 font-body font-semibold text-text-primary transition-all hover:brightness-110 active:scale-[0.98] flex items-center justify-center gap-2"
         >
           View Solution
+          <ChevronRight className="w-4 h-4" />
         </button>
         <button
           onClick={() => navigate('/leaderboard')}

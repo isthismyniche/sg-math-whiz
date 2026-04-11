@@ -7,12 +7,12 @@ interface SuspenseRevealProps {
 }
 
 const phases = [
-  'Checking your answer...',
-  'Hmm, let me see...',
-  'Almost there...',
+  'Marking your work...',
+  'Comparing with today\'s solvers...',
+  'And the verdict is...',
 ]
 
-export function SuspenseReveal({ onComplete, durationMs = 3500 }: SuspenseRevealProps) {
+export function SuspenseReveal({ onComplete, durationMs = 2200 }: SuspenseRevealProps) {
   const [phase, setPhase] = useState(0)
 
   useEffect(() => {
@@ -29,15 +29,26 @@ export function SuspenseReveal({ onComplete, durationMs = 3500 }: SuspenseReveal
   }, [onComplete, durationMs])
 
   return (
-    <div className="flex flex-col items-center gap-6 py-8">
-      {/* Animated pencil/grading indicator */}
-      <motion.div
-        animate={{ rotate: [0, 10, -10, 5, -5, 0] }}
-        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-        className="text-5xl"
-      >
-        ✏️
-      </motion.div>
+    <div className="flex flex-col items-center gap-6 py-12">
+      {/* Animated grading dots */}
+      <div className="flex items-center gap-2">
+        {[0, 1, 2].map((i) => (
+          <motion.div
+            key={i}
+            animate={{
+              scale: [1, 1.4, 1],
+              opacity: [0.4, 1, 0.4],
+            }}
+            transition={{
+              duration: 1,
+              repeat: Infinity,
+              delay: i * 0.2,
+              ease: 'easeInOut',
+            }}
+            className="w-3 h-3 rounded-full bg-accent-amber"
+          />
+        ))}
+      </div>
 
       {/* Progress bar */}
       <div className="w-48 h-1.5 bg-bg-card rounded-full overflow-hidden">
@@ -46,6 +57,9 @@ export function SuspenseReveal({ onComplete, durationMs = 3500 }: SuspenseReveal
           animate={{ width: '100%' }}
           transition={{ duration: durationMs / 1000, ease: 'linear' }}
           className="h-full bg-accent-amber rounded-full"
+          style={{
+            boxShadow: '0 0 8px var(--color-accent-amber)',
+          }}
         />
       </div>
 

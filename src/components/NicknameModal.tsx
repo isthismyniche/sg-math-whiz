@@ -69,7 +69,7 @@ export function NicknameModal() {
               placeholder="Enter your name"
               autoFocus
               maxLength={30}
-              className="w-full rounded-lg bg-bg-card border border-text-secondary/20 px-4 py-3 font-mono text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-accent-amber transition-colors"
+              className="w-full rounded-lg bg-bg-card border border-text-secondary/20 px-4 py-3 font-body text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-accent-amber transition-colors"
             />
             <p className="text-text-secondary/60 text-xs mt-2">
               Use your real name or a unique handle — you'll want to brag on the leaderboard!

@@ -21,6 +21,7 @@ export function ChallengePage() {
   const [phase, setPhase] = useState<Phase>('loading')
   const [question, setQuestion] = useState<TodayResponse | null>(null)
   const [result, setResult] = useState<SubmitResponse | null>(null)
+  const [submittedAnswer, setSubmittedAnswer] = useState<number | undefined>()
   const [error, setError] = useState<string | null>(null)
   const timer = useTimer()
   const pendingResult = useRef<SubmitResponse | null>(null)
@@ -61,6 +62,7 @@ export function ChallengePage() {
       if (!question) return
 
       timer.stop()
+      setSubmittedAnswer(answer)
       setPhase('submitting')
 
       try {
@@ -99,7 +101,7 @@ export function ChallengePage() {
           <p className="text-text-secondary">{error}</p>
           <button
             onClick={() => navigate('/')}
-            className="text-accent-amber text-sm hover:underline"
+            className="text-accent-amber text-sm underline underline-offset-2 hover:brightness-110 py-2 px-3"
           >
             Back to Home
           </button>
@@ -124,7 +126,7 @@ export function ChallengePage() {
       {(phase === 'reveal' || phase === 'answering') && (
         <button
           onClick={() => navigate('/')}
-          className="text-text-secondary text-sm mb-4 hover:text-text-primary transition-colors self-start"
+          className="text-text-secondary text-sm mb-4 hover:text-text-primary transition-colors self-start py-2 px-3 -ml-3 min-h-[44px] flex items-center"
         >
           ← Back
         </button>
@@ -215,7 +217,7 @@ export function ChallengePage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            <ResultDisplay result={result} questionId={question.questionId} />
+            <ResultDisplay result={result} questionId={question.questionId} submittedAnswer={submittedAnswer} />
           </motion.div>
         )}
       </AnimatePresence>

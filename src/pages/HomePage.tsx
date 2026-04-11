@@ -14,6 +14,13 @@ const cardVariants = {
   }),
 }
 
+function getGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour >= 5 && hour < 12) return 'Good morning'
+  if (hour >= 12 && hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
 export function HomePage() {
   const navigate = useNavigate()
   const { displayName } = useAuth()
@@ -37,7 +44,7 @@ export function HomePage() {
           transition={{ delay: 0.2 }}
           className="text-text-secondary text-sm"
         >
-          Hey, {displayName}
+          {getGreeting()}, {displayName}
         </motion.p>
       </div>
 
@@ -58,7 +65,7 @@ export function HomePage() {
           initial="hidden"
           animate="visible"
           onClick={() => navigate('/challenge')}
-          className="w-full text-left rounded-2xl bg-bg-card border-2 border-accent-red/40 p-6 transition-all hover:border-accent-red hover:shadow-lg hover:shadow-accent-red/10 active:scale-[0.98] group"
+          className="w-full text-left rounded-2xl bg-gradient-to-br from-accent-red/5 to-transparent bg-bg-card border-2 border-l-4 border-accent-red/40 border-l-accent-red p-6 transition-all hover:border-accent-red hover:shadow-lg hover:shadow-accent-red/10 active:scale-[0.98] group"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -66,7 +73,7 @@ export function HomePage() {
                 <h2 className="font-display text-2xl text-text-primary">
                   Today's Challenge
                 </h2>
-                <span className="text-[10px] uppercase tracking-widest font-semibold bg-accent-red/20 text-accent-red px-2 py-0.5 rounded-full">
+                <span className="text-[11px] uppercase tracking-widest font-semibold bg-accent-red/20 text-accent-red px-2.5 py-1 rounded-full">
                   New
                 </span>
               </div>
@@ -74,7 +81,7 @@ export function HomePage() {
                 Can you crack today's problem?
               </p>
             </div>
-            <div className="text-3xl opacity-60 group-hover:opacity-100 transition-opacity group-hover:translate-x-1 transition-transform">
+            <div className="text-3xl opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">
               →
             </div>
           </div>
