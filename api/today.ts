@@ -1,15 +1,16 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from './_lib/supabase'
 import { authenticateRequest } from './_lib/auth'
 import { getTodaySGT } from './_lib/dates'
 import type { TodayResponse } from '../src/types'
 
-export default async function handler(request: Request) {
-  if (request.method !== 'GET') {
-    return Response.json({ error: 'Method not allowed' }, { status: 405 })
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const auth = await authenticateRequest(request)
-  if ('error' in auth) return auth.error
+  const userId = await authenticateRequest(req, res)
+  if (!userId) return
 
   const supabase = getSupabase()
   const today = getTodaySGT()
@@ -22,17 +23,14 @@ export default async function handler(request: Request) {
     .single()
 
   if (qErr || !question) {
-    return Response.json(
-      { error: 'No challenge available for today' },
-      { status: 404 }
-    )
+    return res.status(404).json({ error: 'No challenge available for today' })
   }
 
   // Check if user already attempted
   const { data: attempt } = await supabase
     .from('attempts')
     .select('submitted_answer, is_correct, time_ms')
-    .eq('user_id', auth.userId)
+    .eq('user_id', userId)
     .eq('question_id', question.id)
     .single()
 
@@ -50,5 +48,5 @@ export default async function handler(request: Request) {
     }),
   }
 
-  return Response.json(response)
+  return res.json(response)
 }

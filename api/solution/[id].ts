@@ -1,22 +1,20 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from '../_lib/supabase'
 import { authenticateRequest } from '../_lib/auth'
 import type { SolutionResponse } from '../../src/types'
 
-export default async function handler(request: Request) {
-  if (request.method !== 'GET') {
-    return Response.json({ error: 'Method not allowed' }, { status: 405 })
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const auth = await authenticateRequest(request)
-  if ('error' in auth) return auth.error
+  const userId = await authenticateRequest(req, res)
+  if (!userId) return
 
-  // Extract question ID from URL path
-  const url = new URL(request.url)
-  const segments = url.pathname.split('/')
-  const questionId = segments[segments.length - 1]
+  const questionId = req.query.id as string
 
   if (!questionId) {
-    return Response.json({ error: 'Question ID is required' }, { status: 400 })
+    return res.status(400).json({ error: 'Question ID is required' })
   }
 
   const supabase = getSupabase()
@@ -25,15 +23,14 @@ export default async function handler(request: Request) {
   const { data: attempt } = await supabase
     .from('attempts')
     .select('submitted_answer, is_correct, time_ms')
-    .eq('user_id', auth.userId)
+    .eq('user_id', userId)
     .eq('question_id', questionId)
     .single()
 
   if (!attempt) {
-    return Response.json(
-      { error: 'You must attempt the question before viewing the solution' },
-      { status: 403 }
-    )
+    return res.status(403).json({
+      error: 'You must attempt the question before viewing the solution',
+    })
   }
 
   // Fetch the question with solution
@@ -46,7 +43,7 @@ export default async function handler(request: Request) {
     .single()
 
   if (qErr || !question) {
-    return Response.json({ error: 'Question not found' }, { status: 404 })
+    return res.status(404).json({ error: 'Question not found' })
   }
 
   const response: SolutionResponse = {
@@ -64,5 +61,5 @@ export default async function handler(request: Request) {
     },
   }
 
-  return Response.json(response)
+  return res.json(response)
 }

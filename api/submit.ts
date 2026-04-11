@@ -1,23 +1,21 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from './_lib/supabase'
 import { authenticateRequest } from './_lib/auth'
 import { getTodaySGT } from './_lib/dates'
 import type { SubmitRequest, SubmitResponse } from '../src/types'
 
-export default async function handler(request: Request) {
-  if (request.method !== 'POST') {
-    return Response.json({ error: 'Method not allowed' }, { status: 405 })
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const auth = await authenticateRequest(request)
-  if ('error' in auth) return auth.error
+  const userId = await authenticateRequest(req, res)
+  if (!userId) return
 
-  const body = (await request.json()) as SubmitRequest
+  const body = req.body as SubmitRequest
 
   if (!body.questionId || body.answer === undefined || !body.timeMs) {
-    return Response.json(
-      { error: 'questionId, answer, and timeMs are required' },
-      { status: 400 }
-    )
+    return res.status(400).json({ error: 'questionId, answer, and timeMs are required' })
   }
 
   const supabase = getSupabase()
@@ -31,7 +29,7 @@ export default async function handler(request: Request) {
     .single()
 
   if (qErr || !question) {
-    return Response.json({ error: 'Question not found' }, { status: 404 })
+    return res.status(404).json({ error: 'Question not found' })
   }
 
   // Determine if this is a daily attempt (attempted on the assigned date)
@@ -44,7 +42,7 @@ export default async function handler(request: Request) {
 
   // Insert attempt (UNIQUE constraint prevents duplicates)
   const { error: insertErr } = await supabase.from('attempts').insert({
-    user_id: auth.userId,
+    user_id: userId,
     question_id: body.questionId,
     submitted_answer: body.answer,
     is_correct: isCorrect,
@@ -54,13 +52,9 @@ export default async function handler(request: Request) {
 
   if (insertErr) {
     if (insertErr.code === '23505') {
-      // Unique constraint violation — already attempted
-      return Response.json(
-        { error: 'You have already attempted this question' },
-        { status: 409 }
-      )
+      return res.status(409).json({ error: 'You have already attempted this question' })
     }
-    return Response.json({ error: insertErr.message }, { status: 500 })
+    return res.status(500).json({ error: insertErr.message })
   }
 
   // Compute rank if correct and daily
@@ -80,10 +74,10 @@ export default async function handler(request: Request) {
   // Compute streaks
   const { data: currentStreakData } = await supabase.rpc(
     'compute_current_streak',
-    { p_user_id: auth.userId }
+    { p_user_id: userId }
   )
   const { data: bestStreakData } = await supabase.rpc('compute_best_streak', {
-    p_user_id: auth.userId,
+    p_user_id: userId,
   })
 
   const response: SubmitResponse = {
@@ -95,5 +89,5 @@ export default async function handler(request: Request) {
     bestStreak: bestStreakData ?? 0,
   }
 
-  return Response.json(response)
+  return res.json(response)
 }

@@ -1,18 +1,16 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from './_lib/supabase'
 import type { RegisterRequest } from '../src/types'
 
-export default async function handler(request: Request) {
-  if (request.method !== 'POST') {
-    return Response.json({ error: 'Method not allowed' }, { status: 405 })
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const body = (await request.json()) as RegisterRequest
+  const body = req.body as RegisterRequest
 
   if (!body.userId || !body.displayName?.trim()) {
-    return Response.json(
-      { error: 'userId and displayName are required' },
-      { status: 400 }
-    )
+    return res.status(400).json({ error: 'userId and displayName are required' })
   }
 
   const supabase = getSupabase()
@@ -27,8 +25,8 @@ export default async function handler(request: Request) {
     .single()
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 })
+    return res.status(500).json({ error: error.message })
   }
 
-  return Response.json({ id: data.id, displayName: data.display_name })
+  return res.json({ id: data.id, displayName: data.display_name })
 }

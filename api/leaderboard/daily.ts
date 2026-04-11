@@ -1,18 +1,18 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from '../_lib/supabase'
 import { authenticateRequest } from '../_lib/auth'
 import { getTodaySGT } from '../_lib/dates'
 import type { LeaderboardEntry } from '../../src/types'
 
-export default async function handler(request: Request) {
-  if (request.method !== 'GET') {
-    return Response.json({ error: 'Method not allowed' }, { status: 405 })
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const auth = await authenticateRequest(request)
-  if ('error' in auth) return auth.error
+  const userId = await authenticateRequest(req, res)
+  if (!userId) return
 
-  const url = new URL(request.url)
-  const date = url.searchParams.get('date') ?? getTodaySGT()
+  const date = (req.query.date as string) ?? getTodaySGT()
 
   const supabase = getSupabase()
 
@@ -24,7 +24,7 @@ export default async function handler(request: Request) {
     .single()
 
   if (!question) {
-    return Response.json({ entries: [], userRank: null })
+    return res.json({ entries: [], userRank: null })
   }
 
   // Fetch all correct daily attempts, sorted by time
@@ -38,7 +38,7 @@ export default async function handler(request: Request) {
     .limit(50)
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 })
+    return res.status(500).json({ error: error.message })
   }
 
   // Fetch display names for all users in the leaderboard
@@ -58,9 +58,7 @@ export default async function handler(request: Request) {
       userId: a.user_id,
     })) ?? []
 
-  // Find the current user's rank
-  const userRank =
-    entries.find((e) => e.userId === auth.userId)?.rank ?? null
+  const userRank = entries.find((e) => e.userId === userId)?.rank ?? null
 
-  return Response.json({ entries, userRank })
+  return res.json({ entries, userRank })
 }

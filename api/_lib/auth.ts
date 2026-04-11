@@ -1,21 +1,19 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from './supabase'
 
 /**
  * Extract and validate the user ID from the request.
- * Returns the user ID string if valid, or a Response error to return immediately.
+ * Returns the user ID string if valid, or sends an error response and returns null.
  */
 export async function authenticateRequest(
-  request: Request
-): Promise<{ userId: string } | { error: Response }> {
-  const userId = request.headers.get('x-user-id')
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<string | null> {
+  const userId = req.headers['x-user-id'] as string | undefined
 
   if (!userId) {
-    return {
-      error: Response.json(
-        { error: 'Missing x-user-id header' },
-        { status: 401 }
-      ),
-    }
+    res.status(401).json({ error: 'Missing x-user-id header' })
+    return null
   }
 
   const supabase = getSupabase()
@@ -26,13 +24,9 @@ export async function authenticateRequest(
     .single()
 
   if (error || !data) {
-    return {
-      error: Response.json(
-        { error: 'User not found' },
-        { status: 401 }
-      ),
-    }
+    res.status(401).json({ error: 'User not found' })
+    return null
   }
 
-  return { userId }
+  return userId
 }
