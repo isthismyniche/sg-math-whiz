@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSupabase } from './supabase'
+import { getSupabase } from './supabase.js'
 
 /**
  * Extract and validate the user ID from the request.

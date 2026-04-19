@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSupabase } from './_lib/supabase'
-import { authenticateRequest } from './_lib/auth'
-import { getTodaySGT } from './_lib/dates'
+import { getSupabase } from './_lib/supabase.js'
+import { authenticateRequest } from './_lib/auth.js'
+import { getTodaySGT } from './_lib/dates.js'
 import type { PastQuestion } from '../src/types'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

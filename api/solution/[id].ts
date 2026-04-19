@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSupabase } from '../_lib/supabase'
-import { authenticateRequest } from '../_lib/auth'
+import { getSupabase } from '../_lib/supabase.js'
+import { authenticateRequest } from '../_lib/auth.js'
 import type { SolutionResponse } from '../../src/types'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
