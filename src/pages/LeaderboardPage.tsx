@@ -36,7 +36,7 @@ export function LeaderboardPage() {
       setIsLoading(true)
       apiGet<DailyLeaderboardResponse>('/api/leaderboard/daily')
         .then(setDailyData)
-        .catch(() => setDailyData({ entries: [], userRank: null }))
+        .catch(() => setDailyData({ entries: [], userRank: null, correctCount: 0, wrongCount: 0 }))
         .finally(() => setIsLoading(false))
     } else if (tab === 'streaks' && !streakData) {
       setIsLoading(true)
