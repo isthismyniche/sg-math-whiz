@@ -11,7 +11,7 @@ interface SuspenseRevealProps {
 export function SuspenseReveal({ onComplete, durationMs = 1800, apiReady = false }: SuspenseRevealProps) {
   const phrase = useRef(suspensePhrases[Math.floor(Math.random() * suspensePhrases.length)])
   const [timerDone, setTimerDone] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>()
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Main suspense timer
   useEffect(() => {
