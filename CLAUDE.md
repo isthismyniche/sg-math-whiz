@@ -109,6 +109,10 @@ The challenge and solution pages render questions in an exam-paper style (`bg-[#
 
 `ChallengePage` waits for **both** the animation timer (`SuspenseReveal`) **and** the API response before showing the result. `apiReady` is React state (not a ref) so it triggers re-renders. Never revert this to a ref.
 
+## Before shipping to production
+
+Always run `npm run build` and confirm it exits cleanly before committing code intended for production. Fix any TypeScript or build errors before pushing.
+
 ## What Manish decides, not Claude
 
 - All architectural decisions
