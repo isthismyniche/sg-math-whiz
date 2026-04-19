@@ -28,7 +28,7 @@ export function AnswerDistribution({ correctCount, wrongCount }: AnswerDistribut
             data={data}
             lineWidth={30}
             paddingAngle={wrongCount > 0 ? 4 : 0}
-            startAngle={-90}
+            startAngle={180}
             animate
             animationDuration={800}
             animationEasing="ease-out"
