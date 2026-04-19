@@ -1,35 +1,32 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from '../_lib/supabase.js'
 import { authenticateRequest } from '../_lib/auth.js'
+import { json } from '../_lib/response.js'
 import type { TodayResponse } from '../../src/types'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+export const config = { runtime: 'edge' }
 
-  const userId = await authenticateRequest(req, res)
-  if (!userId) return
+export default async function handler(req: Request) {
+  if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
 
-  const date = req.query.date as string
+  const auth = await authenticateRequest(req)
+  if (auth instanceof Response) return auth
+  const userId = auth
+
+  const date = new URL(req.url).pathname.split('/').pop()
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' })
+    return json({ error: 'Invalid date format. Use YYYY-MM-DD.' }, 400)
   }
 
   const supabase = getSupabase()
 
-  // Fetch question for that date — NEVER include correct_answer
   const { data: question, error: qErr } = await supabase
     .from('questions')
     .select('id, question_text, date, source, diagram_url')
     .eq('date', date)
     .single()
 
-  if (qErr || !question) {
-    return res.status(404).json({ error: 'No challenge found for this date' })
-  }
+  if (qErr || !question) return json({ error: 'No challenge found for this date' }, 404)
 
-  // Check if user already attempted
   const { data: attempt } = await supabase
     .from('attempts')
     .select('submitted_answer, is_correct, time_ms')
@@ -37,7 +34,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .eq('question_id', question.id)
     .single()
 
-  // If already attempted, fetch enriched data
   let attemptData: TodayResponse['attempt'] | undefined
   if (attempt) {
     const { data: fullQ } = await supabase
@@ -81,5 +77,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ...(attemptData && { attempt: attemptData }),
   }
 
-  return res.json(response)
+  return json(response)
 }

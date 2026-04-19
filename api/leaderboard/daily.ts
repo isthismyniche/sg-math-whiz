@@ -1,33 +1,29 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from '../_lib/supabase.js'
 import { authenticateRequest } from '../_lib/auth.js'
 import { getTodaySGT } from '../_lib/dates.js'
+import { json } from '../_lib/response.js'
 import type { LeaderboardEntry } from '../../src/types'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+export const config = { runtime: 'edge' }
 
-  const userId = await authenticateRequest(req, res)
-  if (!userId) return
+export default async function handler(req: Request) {
+  if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
 
-  const date = (req.query.date as string) ?? getTodaySGT()
+  const auth = await authenticateRequest(req)
+  if (auth instanceof Response) return auth
+  const userId = auth
 
+  const date = new URL(req.url).searchParams.get('date') ?? getTodaySGT()
   const supabase = getSupabase()
 
-  // Find the question for this date
   const { data: question } = await supabase
     .from('questions')
     .select('id')
     .eq('date', date)
     .single()
 
-  if (!question) {
-    return res.json({ entries: [], userRank: null })
-  }
+  if (!question) return json({ entries: [], userRank: null, correctCount: 0, wrongCount: 0 })
 
-  // Fetch all correct daily attempts, sorted by time
   const { data: attempts, error } = await supabase
     .from('attempts')
     .select('user_id, time_ms')
@@ -37,11 +33,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .order('time_ms', { ascending: true })
     .limit(50)
 
-  if (error) {
-    return res.status(500).json({ error: error.message })
-  }
+  if (error) return json({ error: error.message }, 500)
 
-  // Count wrong daily attempts
   const { count: wrongCount } = await supabase
     .from('attempts')
     .select('id', { count: 'exact', head: true })
@@ -49,7 +42,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .eq('is_correct', false)
     .eq('is_daily', true)
 
-  // Fetch display names for all users in the leaderboard
   const userIds = attempts?.map((a) => a.user_id) ?? []
   const { data: users } = await supabase
     .from('users')
@@ -69,5 +61,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userRank = entries.find((e) => e.userId === userId)?.rank ?? null
   const correctCount = entries.length
 
-  return res.json({ entries, userRank, correctCount, wrongCount: wrongCount ?? 0 })
+  return json({ entries, userRank, correctCount, wrongCount: wrongCount ?? 0 })
 }

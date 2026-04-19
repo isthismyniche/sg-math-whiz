@@ -1,39 +1,32 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from '../_lib/supabase.js'
 import { authenticateRequest } from '../_lib/auth.js'
+import { json } from '../_lib/response.js'
 import type { StreakLeaderboardEntry } from '../../src/types'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+export const config = { runtime: 'edge' }
 
-  const userId = await authenticateRequest(req, res)
-  if (!userId) return
+export default async function handler(req: Request) {
+  if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+
+  const auth = await authenticateRequest(req)
+  if (auth instanceof Response) return auth
+  const userId = auth
 
   const supabase = getSupabase()
 
-  // Fetch all users
   const { data: users, error: uErr } = await supabase
     .from('users')
     .select('id, display_name')
 
-  if (uErr || !users) {
-    return res.status(500).json({ error: 'Failed to fetch users' })
-  }
+  if (uErr || !users) return json({ error: 'Failed to fetch users' }, 500)
 
-  // Compute streak for each user
   const entries: StreakLeaderboardEntry[] = []
 
   for (const user of users) {
-    const { data: streak } = await supabase.rpc('compute_current_streak', {
-      p_user_id: user.id,
-    })
-
+    const { data: streak } = await supabase.rpc('compute_current_streak', { p_user_id: user.id })
     const currentStreak = streak ?? 0
     if (currentStreak === 0) continue
 
-    // Compute average time for correct daily attempts
     const { data: avgData } = await supabase
       .from('attempts')
       .select('time_ms')
@@ -45,26 +38,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? Math.round(avgData.reduce((sum, a) => sum + a.time_ms, 0) / avgData.length)
       : 0
 
-    entries.push({
-      rank: 0,
-      displayName: user.display_name,
-      currentStreak,
-      avgTimeMs,
-      userId: user.id,
-    })
+    entries.push({ rank: 0, displayName: user.display_name, currentStreak, avgTimeMs, userId: user.id })
   }
 
-  // Sort by streak descending, then by avg time ascending
   entries.sort((a, b) => b.currentStreak - a.currentStreak || a.avgTimeMs - b.avgTimeMs)
+  entries.forEach((e, i) => { e.rank = i + 1 })
 
-  // Assign ranks
-  entries.forEach((e, i) => {
-    e.rank = i + 1
-  })
-
-  // Limit to top 50
   const top = entries.slice(0, 50)
   const userRank = entries.find((e) => e.userId === userId)?.rank ?? null
 
-  return res.json({ entries: top, userRank })
+  return json({ entries: top, userRank })
 }

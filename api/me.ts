@@ -1,37 +1,30 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from './_lib/supabase.js'
 import { authenticateRequest } from './_lib/auth.js'
 import { getTodaySGT } from './_lib/dates.js'
+import { json } from './_lib/response.js'
 import type { UserStats } from '../src/types'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+export const config = { runtime: 'edge' }
 
-  const userId = await authenticateRequest(req, res)
-  if (!userId) return
+export default async function handler(req: Request) {
+  if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+
+  const auth = await authenticateRequest(req)
+  if (auth instanceof Response) return auth
+  const userId = auth
 
   const supabase = getSupabase()
   const today = getTodaySGT()
 
-  // Fetch user profile
   const { data: user } = await supabase
     .from('users')
     .select('display_name')
     .eq('id', userId)
     .single()
 
-  // Compute streaks
-  const { data: currentStreak } = await supabase.rpc(
-    'compute_current_streak',
-    { p_user_id: userId }
-  )
-  const { data: bestStreak } = await supabase.rpc('compute_best_streak', {
-    p_user_id: userId,
-  })
+  const { data: currentStreak } = await supabase.rpc('compute_current_streak', { p_user_id: userId })
+  const { data: bestStreak } = await supabase.rpc('compute_best_streak', { p_user_id: userId })
 
-  // Count total attempts and correct attempts
   const { count: totalAttempts } = await supabase
     .from('attempts')
     .select('*', { count: 'exact', head: true })
@@ -45,7 +38,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .eq('is_daily', true)
     .eq('is_correct', true)
 
-  // Check if user attempted today's question
   const { data: todayQ } = await supabase
     .from('questions')
     .select('id')
@@ -71,5 +63,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     attemptedToday,
   }
 
-  return res.json(stats)
+  return json(stats)
 }

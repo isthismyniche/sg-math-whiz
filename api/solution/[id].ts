@@ -1,25 +1,22 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from '../_lib/supabase.js'
 import { authenticateRequest } from '../_lib/auth.js'
+import { json } from '../_lib/response.js'
 import type { SolutionResponse } from '../../src/types'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+export const config = { runtime: 'edge' }
 
-  const userId = await authenticateRequest(req, res)
-  if (!userId) return
+export default async function handler(req: Request) {
+  if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
 
-  const questionId = req.query.id as string
+  const auth = await authenticateRequest(req)
+  if (auth instanceof Response) return auth
+  const userId = auth
 
-  if (!questionId) {
-    return res.status(400).json({ error: 'Question ID is required' })
-  }
+  const questionId = new URL(req.url).pathname.split('/').pop()
+  if (!questionId) return json({ error: 'Question ID is required' }, 400)
 
   const supabase = getSupabase()
 
-  // Check that the user has attempted this question (prevent peeking)
   const { data: attempt } = await supabase
     .from('attempts')
     .select('submitted_answer, is_correct, time_ms')
@@ -28,23 +25,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .single()
 
   if (!attempt) {
-    return res.status(403).json({
-      error: 'You must attempt the question before viewing the solution',
-    })
+    return json({ error: 'You must attempt the question before viewing the solution' }, 403)
   }
 
-  // Fetch the question with solution
   const { data: question, error: qErr } = await supabase
     .from('questions')
-    .select(
-      'id, question_text, date, correct_answer, solution_explanation, source, topic, diagram_url'
-    )
+    .select('id, question_text, date, correct_answer, solution_explanation, source, topic, diagram_url')
     .eq('id', questionId)
     .single()
 
-  if (qErr || !question) {
-    return res.status(404).json({ error: 'Question not found' })
-  }
+  if (qErr || !question) return json({ error: 'Question not found' }, 404)
 
   const response: SolutionResponse = {
     questionId: question.id,
@@ -62,5 +52,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     },
   }
 
-  return res.json(response)
+  return json(response)
 }

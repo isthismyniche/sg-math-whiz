@@ -1,21 +1,21 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from './_lib/supabase.js'
 import { authenticateRequest } from './_lib/auth.js'
 import { getTodaySGT } from './_lib/dates.js'
+import { json } from './_lib/response.js'
 import type { PastQuestion } from '../src/types'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+export const config = { runtime: 'edge' }
 
-  const userId = await authenticateRequest(req, res)
-  if (!userId) return
+export default async function handler(req: Request) {
+  if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+
+  const auth = await authenticateRequest(req)
+  if (auth instanceof Response) return auth
+  const userId = auth
 
   const supabase = getSupabase()
   const today = getTodaySGT()
 
-  // Fetch all questions before today, newest first
   const { data: questions, error } = await supabase
     .from('questions')
     .select('id, date, topic')
@@ -23,15 +23,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .order('date', { ascending: false })
     .limit(100)
 
-  if (error) {
-    return res.status(500).json({ error: error.message })
-  }
+  if (error) return json({ error: error.message }, 500)
+  if (!questions || questions.length === 0) return json([])
 
-  if (!questions || questions.length === 0) {
-    return res.json([])
-  }
-
-  // Check which questions the user has attempted
   const questionIds = questions.map((q) => q.id)
   const { data: attempts } = await supabase
     .from('attempts')
@@ -47,5 +41,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     attempted: attemptedSet.has(q.id),
   }))
 
-  return res.json(result)
+  return json(result)
 }

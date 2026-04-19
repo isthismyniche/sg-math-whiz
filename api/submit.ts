@@ -1,46 +1,40 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from './_lib/supabase.js'
 import { authenticateRequest } from './_lib/auth.js'
 import { getTodaySGT } from './_lib/dates.js'
+import { json } from './_lib/response.js'
 import type { SubmitRequest, SubmitResponse } from '../src/types'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+export const config = { runtime: 'edge' }
 
-  const userId = await authenticateRequest(req, res)
-  if (!userId) return
+export default async function handler(req: Request) {
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
-  const body = req.body as SubmitRequest
+  const auth = await authenticateRequest(req)
+  if (auth instanceof Response) return auth
+  const userId = auth
+
+  const body = await req.json() as SubmitRequest
 
   if (!body.questionId || body.answer === undefined || !body.timeMs) {
-    return res.status(400).json({ error: 'questionId, answer, and timeMs are required' })
+    return json({ error: 'questionId, answer, and timeMs are required' }, 400)
   }
 
   const supabase = getSupabase()
   const today = getTodaySGT()
 
-  // Fetch the question WITH correct_answer (server-side only)
   const { data: question, error: qErr } = await supabase
     .from('questions')
     .select('id, correct_answer, date')
     .eq('id', body.questionId)
     .single()
 
-  if (qErr || !question) {
-    return res.status(404).json({ error: 'Question not found' })
-  }
+  if (qErr || !question) return json({ error: 'Question not found' }, 404)
 
-  // Determine if this is a daily attempt (attempted on the assigned date)
   const isDaily = question.date === today
-
-  // Compare answers: numeric comparison with small tolerance for floating point
   const correctAnswer = Number(question.correct_answer)
   const submittedAnswer = Number(body.answer)
   const isCorrect = Math.abs(correctAnswer - submittedAnswer) < 0.01
 
-  // Insert attempt (UNIQUE constraint prevents duplicates)
   const { error: insertErr } = await supabase.from('attempts').insert({
     user_id: userId,
     question_id: body.questionId,
@@ -52,12 +46,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (insertErr) {
     if (insertErr.code === '23505') {
-      return res.status(409).json({ error: 'You have already attempted this question' })
+      return json({ error: 'You have already attempted this question' }, 409)
     }
-    return res.status(500).json({ error: insertErr.message })
+    return json({ error: insertErr.message }, 500)
   }
 
-  // Compute rank if correct and daily
   let rank: number | undefined
   if (isCorrect && isDaily) {
     const { count } = await supabase
@@ -67,18 +60,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('is_correct', true)
       .eq('is_daily', true)
       .lt('time_ms', body.timeMs)
-
     rank = (count ?? 0) + 1
   }
 
-  // Compute streaks
-  const { data: currentStreakData } = await supabase.rpc(
-    'compute_current_streak',
-    { p_user_id: userId }
-  )
-  const { data: bestStreakData } = await supabase.rpc('compute_best_streak', {
-    p_user_id: userId,
-  })
+  const { data: currentStreakData } = await supabase.rpc('compute_current_streak', { p_user_id: userId })
+  const { data: bestStreakData } = await supabase.rpc('compute_best_streak', { p_user_id: userId })
 
   const response: SubmitResponse = {
     isCorrect,
@@ -89,5 +75,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     bestStreak: bestStreakData ?? 0,
   }
 
-  return res.json(response)
+  return json(response)
 }

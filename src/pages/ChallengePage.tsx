@@ -9,7 +9,7 @@ import { ResultDisplay } from '../components/ResultDisplay'
 import { Countdown } from '../components/Countdown'
 import { useTimer } from '../hooks/useTimer'
 import { apiGet, apiPost } from '../lib/api'
-import { markTodayAttempted } from '../lib/storage'
+import { markTodayAttempted, clearCachedStats } from '../lib/storage'
 import { countdownQuotes } from '../lib/quotes'
 import type { TodayResponse, SubmitRequest, SubmitResponse } from '../types'
 
@@ -80,7 +80,7 @@ export function ChallengePage() {
         }
         const res = await apiPost<SubmitResponse>('/api/submit', body)
         pendingResult.current = res
-        if (!dateParam) markTodayAttempted()
+        if (!dateParam) { markTodayAttempted(); clearCachedStats() }
         setApiReady(true)
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Submission failed'

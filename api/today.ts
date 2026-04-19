@@ -1,21 +1,21 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSupabase } from './_lib/supabase.js'
 import { authenticateRequest } from './_lib/auth.js'
 import { getTodaySGT } from './_lib/dates.js'
+import { json } from './_lib/response.js'
 import type { TodayResponse } from '../src/types'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+export const config = { runtime: 'edge' }
 
-  const userId = await authenticateRequest(req, res)
-  if (!userId) return
+export default async function handler(req: Request) {
+  if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+
+  const auth = await authenticateRequest(req)
+  if (auth instanceof Response) return auth
+  const userId = auth
 
   const supabase = getSupabase()
   const today = getTodaySGT()
 
-  // Fetch today's question — NEVER include correct_answer
   const { data: question, error: qErr } = await supabase
     .from('questions')
     .select('id, question_text, date, diagram_url')
@@ -23,10 +23,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .single()
 
   if (qErr || !question) {
-    return res.status(404).json({ error: 'No challenge available for today' })
+    return json({ error: 'No challenge available for today' }, 404)
   }
 
-  // Check if user already attempted
   const { data: attempt } = await supabase
     .from('attempts')
     .select('submitted_answer, is_correct, time_ms')
@@ -34,21 +33,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .eq('question_id', question.id)
     .single()
 
-  // If already attempted, fetch additional data for result display
   let attemptData: TodayResponse['attempt'] | undefined
   if (attempt) {
-    // Fetch correct answer
     const { data: fullQ } = await supabase
       .from('questions')
       .select('correct_answer')
       .eq('id', question.id)
       .single()
 
-    // Compute streaks
     const { data: currentStreak } = await supabase.rpc('compute_current_streak', { p_user_id: userId })
     const { data: bestStreak } = await supabase.rpc('compute_best_streak', { p_user_id: userId })
 
-    // Compute rank if correct
     let rank: number | undefined
     if (attempt.is_correct) {
       const { count } = await supabase
@@ -81,5 +76,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ...(attemptData && { attempt: attemptData }),
   }
 
-  return res.json(response)
+  return json(response)
 }
