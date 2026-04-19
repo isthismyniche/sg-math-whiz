@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { AppShell } from '../components/layout/AppShell'
 import { LeaderboardTable } from '../components/LeaderboardTable'
 import { StreakLeaderboardTable } from '../components/StreakLeaderboardTable'
+import { AnswerDistribution } from '../components/AnswerDistribution'
 import { useAuth } from '../hooks/useAuth'
 import { apiGet } from '../lib/api'
 import type { LeaderboardEntry, StreakLeaderboardEntry } from '../types'
@@ -13,6 +14,8 @@ type Tab = 'daily' | 'streaks'
 interface DailyLeaderboardResponse {
   entries: LeaderboardEntry[]
   userRank: number | null
+  correctCount: number
+  wrongCount: number
 }
 
 interface StreakLeaderboardResponse {
@@ -101,10 +104,16 @@ export function LeaderboardPage() {
       ) : (
         <>
           {tab === 'daily' ? (
-            <LeaderboardTable
-              entries={dailyData?.entries ?? []}
-              currentUserId={userId}
-            />
+            <>
+              <LeaderboardTable
+                entries={dailyData?.entries ?? []}
+                currentUserId={userId}
+              />
+              <AnswerDistribution
+                correctCount={dailyData?.correctCount ?? 0}
+                wrongCount={dailyData?.wrongCount ?? 0}
+              />
+            </>
           ) : (
             <StreakLeaderboardTable
               entries={streakData?.entries ?? []}

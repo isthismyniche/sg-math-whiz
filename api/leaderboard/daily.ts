@@ -41,6 +41,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: error.message })
   }
 
+  // Count wrong daily attempts
+  const { count: wrongCount } = await supabase
+    .from('attempts')
+    .select('id', { count: 'exact', head: true })
+    .eq('question_id', question.id)
+    .eq('is_correct', false)
+    .eq('is_daily', true)
+
   // Fetch display names for all users in the leaderboard
   const userIds = attempts?.map((a) => a.user_id) ?? []
   const { data: users } = await supabase
@@ -59,6 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })) ?? []
 
   const userRank = entries.find((e) => e.userId === userId)?.rank ?? null
+  const correctCount = entries.length
 
-  return res.json({ entries, userRank })
+  return res.json({ entries, userRank, correctCount, wrongCount: wrongCount ?? 0 })
 }
