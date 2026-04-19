@@ -2,16 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AppShell } from '../components/layout/AppShell'
-import { QuestionReveal } from '../components/QuestionReveal'
+import { ExamPaper } from '../components/ExamPaper'
 import { Timer } from '../components/Timer'
-import { AnswerInput } from '../components/AnswerInput'
 import { SuspenseReveal } from '../components/SuspenseReveal'
 import { ResultDisplay } from '../components/ResultDisplay'
+import { Countdown } from '../components/Countdown'
 import { useTimer } from '../hooks/useTimer'
 import { apiGet, apiPost } from '../lib/api'
+import { markTodayAttempted } from '../lib/storage'
+import { countdownQuotes } from '../lib/quotes'
 import type { TodayResponse, SubmitRequest, SubmitResponse } from '../types'
 
-type Phase = 'loading' | 'reveal' | 'answering' | 'submitting' | 'suspense' | 'result'
+type Phase = 'loading' | 'countdown' | 'question' | 'suspense' | 'result'
 
 export function ChallengePage() {
   const navigate = useNavigate()
@@ -23,8 +25,10 @@ export function ChallengePage() {
   const [result, setResult] = useState<SubmitResponse | null>(null)
   const [submittedAnswer, setSubmittedAnswer] = useState<number | undefined>()
   const [error, setError] = useState<string | null>(null)
+  const [apiReady, setApiReady] = useState(false)
   const timer = useTimer()
   const pendingResult = useRef<SubmitResponse | null>(null)
+  const countdownQuote = useRef(countdownQuotes[Math.floor(Math.random() * countdownQuotes.length)])
 
   // Fetch today's question (or a specific date's question)
   useEffect(() => {
@@ -34,26 +38,27 @@ export function ChallengePage() {
       .then((data) => {
         setQuestion(data)
         if (data.alreadyAttempted && data.attempt) {
-          // Already attempted — skip straight to result
+          setSubmittedAnswer(data.attempt.submittedAnswer ?? undefined)
           setResult({
             isCorrect: data.attempt.isCorrect,
-            correctAnswer: 0, // Not available from today endpoint
+            correctAnswer: data.attempt.correctAnswer ?? 0,
             timeMs: data.attempt.timeMs,
-            currentStreak: 0,
-            bestStreak: 0,
+            rank: data.attempt.rank,
+            currentStreak: data.attempt.currentStreak ?? 0,
+            bestStreak: data.attempt.bestStreak ?? 0,
           })
           setPhase('result')
         } else {
-          setPhase('reveal')
+          setPhase('countdown')
         }
       })
       .catch(() => {
         setError('No challenge available. Check back tomorrow!')
       })
-  }, [dateParam])
+  }, [dateParam]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleRevealComplete = useCallback(() => {
-    setPhase('answering')
+  const handleCountdownComplete = useCallback(() => {
+    setPhase('question')
     timer.start()
   }, [timer])
 
@@ -63,7 +68,9 @@ export function ChallengePage() {
 
       timer.stop()
       setSubmittedAnswer(answer)
-      setPhase('submitting')
+      pendingResult.current = null
+      setApiReady(false)
+      setPhase('suspense')
 
       try {
         const body: SubmitRequest = {
@@ -72,19 +79,20 @@ export function ChallengePage() {
           timeMs: Math.round(timer.elapsedMs),
         }
         const res = await apiPost<SubmitResponse>('/api/submit', body)
-        // Store result but don't show yet — wait for suspense
         pendingResult.current = res
-        setPhase('suspense')
+        if (!dateParam) markTodayAttempted()
+        setApiReady(true)
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Submission failed'
         setError(message)
-        setPhase('answering')
-        timer.start() // Resume timer on error
+        setPhase('question')
+        timer.start()
       }
     },
-    [question, timer]
+    [question, timer, dateParam]
   )
 
+  // SuspenseReveal calls this when both its timer AND apiReady are true
   const handleSuspenseComplete = useCallback(() => {
     if (pendingResult.current) {
       setResult(pendingResult.current)
@@ -92,7 +100,7 @@ export function ChallengePage() {
     setPhase('result')
   }, [])
 
-  // Loading state
+  // Error state
   if (error && phase === 'loading') {
     return (
       <AppShell>
@@ -101,7 +109,7 @@ export function ChallengePage() {
           <p className="text-text-secondary">{error}</p>
           <button
             onClick={() => navigate('/')}
-            className="text-accent-amber text-sm underline underline-offset-2 hover:brightness-110 py-2 px-3"
+            className="text-accent-amber text-base underline underline-offset-2 hover:brightness-110 py-2 px-3"
           >
             Back to Home
           </button>
@@ -110,6 +118,7 @@ export function ChallengePage() {
     )
   }
 
+  // Loading state
   if (phase === 'loading') {
     return (
       <AppShell>
@@ -122,31 +131,45 @@ export function ChallengePage() {
 
   return (
     <AppShell>
-      {/* Back button (only during reveal/answering) */}
-      {(phase === 'reveal' || phase === 'answering') && (
+      {/* Back button (only during question phase) */}
+      {phase === 'question' && (
         <button
           onClick={() => navigate('/')}
-          className="text-text-secondary text-sm mb-4 hover:text-text-primary transition-colors self-start py-2 px-3 -ml-3 min-h-[44px] flex items-center"
+          className="text-text-secondary text-base mb-4 hover:text-text-primary transition-colors self-start py-2 px-3 -ml-3 min-h-[44px] flex items-center"
         >
           ← Back
         </button>
       )}
 
       <AnimatePresence mode="wait">
-        {/* Question Reveal Phase */}
-        {phase === 'reveal' && question && (
+        {/* Countdown Phase */}
+        {phase === 'countdown' && (
           <motion.div
-            key="reveal"
+            key="countdown"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <div className="text-center mb-6">
-              <p className="text-text-secondary text-sm">
+            <Countdown quote={countdownQuote.current} onComplete={handleCountdownComplete} />
+          </motion.div>
+        )}
+
+        {/* Question Phase — exam paper + timer */}
+        {phase === 'question' && question && (
+          <motion.div
+            key="question"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="space-y-5"
+          >
+            {/* Date header */}
+            <div className="text-center">
+              <p className="text-text-secondary text-base">
                 {dateParam ?? "Today's Challenge"}
               </p>
               {question.date && (
-                <p className="text-text-secondary/50 text-xs mt-1">
+                <p className="text-text-secondary/50 text-sm mt-1">
                   {new Date(question.date + 'T00:00:00').toLocaleDateString('en-SG', {
                     weekday: 'long',
                     day: 'numeric',
@@ -156,57 +179,37 @@ export function ChallengePage() {
                 </p>
               )}
             </div>
-            <QuestionReveal
-              text={question.questionText}
-              onRevealComplete={handleRevealComplete}
-            />
-            <div className="text-center mt-6">
-              <p className="text-text-secondary/40 text-xs">
-                Timer starts after the question is revealed...
-              </p>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Answering Phase */}
-        {phase === 'answering' && question && (
-          <motion.div
-            key="answering"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="space-y-6"
-          >
-            {/* Question text (static, already revealed) */}
-            <div className="bg-bg-card rounded-2xl p-6 border border-text-secondary/10">
-              <div className="font-display text-xl leading-relaxed text-text-primary">
-                {question.questionText}
-              </div>
-            </div>
 
             {/* Timer */}
             <div className="flex justify-center">
               <Timer elapsedMs={timer.elapsedMs} />
             </div>
 
-            {/* Answer input */}
-            <AnswerInput onSubmit={handleSubmit} />
+            {/* Exam paper with question + answer input */}
+            <ExamPaper
+              questionText={question.questionText}
+              diagramUrl={question.diagramUrl}
+              onSubmit={handleSubmit}
+            />
 
             {error && (
-              <p className="text-error text-sm text-center">{error}</p>
+              <p className="text-error text-base text-center">{error}</p>
             )}
           </motion.div>
         )}
 
-        {/* Submitting / Suspense Phase */}
-        {(phase === 'submitting' || phase === 'suspense') && (
+        {/* Suspense Phase */}
+        {phase === 'suspense' && (
           <motion.div
             key="suspense"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }}
           >
-            <SuspenseReveal onComplete={handleSuspenseComplete} />
+            <SuspenseReveal
+              onComplete={handleSuspenseComplete}
+              apiReady={apiReady}
+            />
           </motion.div>
         )}
 
@@ -214,8 +217,9 @@ export function ChallengePage() {
         {phase === 'result' && result && question && (
           <motion.div
             key="result"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
           >
             <ResultDisplay result={result} questionId={question.questionId} submittedAnswer={submittedAnswer} />
           </motion.div>

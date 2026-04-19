@@ -15,12 +15,12 @@ export function StreakBadge({ current, best }: StreakBadgeProps) {
         transition={{ delay: 0.2, type: 'spring', stiffness: 160, damping: 14 }}
         className="flex items-center gap-2 bg-bg-card rounded-xl px-4 py-2"
       >
-        <Flame className="w-6 h-6 text-streak" />
+        <Flame className="w-7 h-7 text-streak" />
         <div>
-          <div className="font-mono text-xl font-bold text-streak leading-tight">
+          <div className="font-mono text-2xl font-bold text-streak leading-tight">
             {current}
           </div>
-          <div className="text-text-secondary text-[10px] uppercase tracking-wider">
+          <div className="text-text-secondary text-xs uppercase tracking-wider">
             Streak
           </div>
         </div>
@@ -32,12 +32,12 @@ export function StreakBadge({ current, best }: StreakBadgeProps) {
         transition={{ delay: 0.3, type: 'spring', stiffness: 160, damping: 14 }}
         className="flex items-center gap-2 bg-bg-card rounded-xl px-4 py-2"
       >
-        <Star className="w-6 h-6 text-text-primary" />
+        <Star className="w-7 h-7 text-text-primary" />
         <div>
-          <div className="font-mono text-xl font-bold text-text-primary leading-tight">
+          <div className="font-mono text-2xl font-bold text-text-primary leading-tight">
             {best}
           </div>
-          <div className="text-text-secondary text-[10px] uppercase tracking-wider">
+          <div className="text-text-secondary text-xs uppercase tracking-wider">
             Best
           </div>
         </div>

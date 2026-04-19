@@ -30,3 +30,10 @@ dist-ssr
 logs
 *.log
 npm-debug.log*
+
+# Question ingestion data (PDFs, extracted JSON, curated, review files, diagrams)
+data/papers/
+data/extracted/
+data/curated/
+data/review/
+data/diagrams/

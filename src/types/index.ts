@@ -8,6 +8,7 @@ export interface RegisterRequest {
 export interface TodayResponse {
   questionId: string
   questionText: string
+  diagramUrl?: string | null
   date: string // YYYY-MM-DD
   alreadyAttempted: boolean
   attempt?: AttemptResult // included if already attempted
@@ -31,6 +32,7 @@ export interface SubmitResponse {
 export interface SolutionResponse {
   questionId: string
   questionText: string
+  diagramUrl?: string | null
   date: string
   correctAnswer: number
   solutionExplanation: string | null
@@ -43,6 +45,10 @@ export interface AttemptResult {
   submittedAnswer: number | null
   isCorrect: boolean
   timeMs: number
+  correctAnswer?: number
+  rank?: number
+  currentStreak?: number
+  bestStreak?: number
 }
 
 export interface LeaderboardEntry {
@@ -66,6 +72,7 @@ export interface UserStats {
   bestStreak: number
   totalAttempts: number
   totalCorrect: number
+  attemptedToday: boolean
 }
 
 export interface PastQuestion {

@@ -68,7 +68,7 @@ export function SolutionPage() {
         className="mb-6"
       >
         <div className="flex items-center gap-2 mb-1">
-          <p className="text-text-secondary text-sm">
+          <p className="text-text-secondary text-base">
             {new Date(solution.date + 'T00:00:00').toLocaleDateString('en-SG', {
               weekday: 'long',
               day: 'numeric',
@@ -87,15 +87,44 @@ export function SolutionPage() {
         )}
       </motion.div>
 
-      {/* Question */}
+      {/* Question — exam paper style */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-bg-card rounded-2xl p-6 border border-text-secondary/10 mb-4"
+        className="relative rounded-lg overflow-hidden mb-4"
+        style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.2)' }}
       >
-        <div className="font-display text-xl leading-relaxed text-text-primary">
-          {solution.questionText}
+        <div className="bg-[#FFFEF9] px-6 py-6 sm:px-8 relative">
+          <div
+            className="absolute inset-0 pointer-events-none opacity-[0.08]"
+            style={{
+              backgroundImage: 'repeating-linear-gradient(transparent, transparent 31px, #4A90A4 31px, #4A90A4 32px)',
+              backgroundPosition: '0 7px',
+            }}
+          />
+          <div
+            className="absolute top-0 bottom-0 left-10 sm:left-12 w-[1px] opacity-20 pointer-events-none"
+            style={{ backgroundColor: '#E63946' }}
+          />
+          <div className="relative flex gap-3 sm:gap-4">
+            <span className="font-serif text-[#1a1a1a] font-bold text-lg leading-relaxed shrink-0 mt-[1px]">
+              1.
+            </span>
+            <div className="font-serif text-[#1a1a1a] text-lg leading-relaxed text-justify">
+              {solution.questionText}
+            </div>
+          </div>
+          {solution.diagramUrl && (
+            <div className="mt-5 flex justify-center">
+              <img
+                src={solution.diagramUrl}
+                alt="Question diagram"
+                className="max-w-full rounded border border-[#1a1a1a]/10"
+                style={{ maxHeight: '840px', objectFit: 'contain' }}
+              />
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -108,11 +137,11 @@ export function SolutionPage() {
           className="grid grid-cols-3 gap-3 mb-6"
         >
           <div className="bg-bg-card rounded-xl p-3 text-center">
-            <div className="text-text-secondary text-[10px] uppercase tracking-wider mb-1">
+            <div className="text-text-secondary text-xs uppercase tracking-wider mb-1">
               Your Answer
             </div>
             <div
-              className={`font-mono text-sm font-bold ${
+              className={`font-mono text-base font-bold ${
                 solution.attempt.isCorrect ? 'text-success' : 'text-error'
               }`}
             >
@@ -120,18 +149,18 @@ export function SolutionPage() {
             </div>
           </div>
           <div className="bg-bg-card rounded-xl p-3 text-center">
-            <div className="text-text-secondary text-[10px] uppercase tracking-wider mb-1">
+            <div className="text-text-secondary text-xs uppercase tracking-wider mb-1">
               Correct
             </div>
-            <div className="font-mono text-sm font-bold text-accent-amber">
+            <div className="font-mono text-base font-bold text-accent-amber">
               {solution.correctAnswer}
             </div>
           </div>
           <div className="bg-bg-card rounded-xl p-3 text-center">
-            <div className="text-text-secondary text-[10px] uppercase tracking-wider mb-1">
+            <div className="text-text-secondary text-xs uppercase tracking-wider mb-1">
               Time
             </div>
-            <div className="font-mono text-sm font-bold text-text-primary">
+            <div className="font-mono text-base font-bold text-text-primary">
               {formatTime(solution.attempt.timeMs)}
             </div>
           </div>
@@ -145,9 +174,9 @@ export function SolutionPage() {
         transition={{ delay: 0.3 }}
         className="bg-bg-secondary rounded-2xl p-6 border border-text-secondary/10"
       >
-        <h3 className="font-display text-lg text-text-primary mb-4">Solution</h3>
+        <h3 className="font-display text-2xl text-text-primary mb-4">Solution</h3>
         {solution.solutionExplanation ? (
-          <div className="text-text-secondary text-sm leading-relaxed whitespace-pre-wrap font-body">
+          <div className="text-text-secondary text-base leading-relaxed whitespace-pre-wrap font-body">
             {solution.solutionExplanation}
           </div>
         ) : (

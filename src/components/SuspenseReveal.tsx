@@ -1,36 +1,36 @@
-import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
+import { suspensePhrases } from '../lib/quotes'
 
 interface SuspenseRevealProps {
   onComplete: () => void
   durationMs?: number
+  apiReady?: boolean
 }
 
-const phases = [
-  'Marking your work...',
-  'Comparing with today\'s solvers...',
-  'And the verdict is...',
-]
+export function SuspenseReveal({ onComplete, durationMs = 1800, apiReady = false }: SuspenseRevealProps) {
+  const phrase = useRef(suspensePhrases[Math.floor(Math.random() * suspensePhrases.length)])
+  const [timerDone, setTimerDone] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout>>()
 
-export function SuspenseReveal({ onComplete, durationMs = 2200 }: SuspenseRevealProps) {
-  const [phase, setPhase] = useState(0)
-
+  // Main suspense timer
   useEffect(() => {
-    const phaseInterval = durationMs / phases.length
-    const timers: ReturnType<typeof setTimeout>[] = []
+    timerRef.current = setTimeout(() => setTimerDone(true), durationMs)
+    return () => clearTimeout(timerRef.current)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    for (let i = 1; i < phases.length; i++) {
-      timers.push(setTimeout(() => setPhase(i), phaseInterval * i))
+  // When both timer and API are done, fire completion
+  useEffect(() => {
+    if (timerDone && apiReady) {
+      onComplete()
     }
+  }, [timerDone, apiReady, onComplete])
 
-    timers.push(setTimeout(onComplete, durationMs))
-
-    return () => timers.forEach(clearTimeout)
-  }, [onComplete, durationMs])
+  const waiting = timerDone && !apiReady
 
   return (
-    <div className="flex flex-col items-center gap-6 py-12">
-      {/* Animated grading dots */}
+    <div className="flex flex-col items-center gap-6 py-16">
+      {/* Pulsing dots */}
       <div className="flex items-center gap-2">
         {[0, 1, 2].map((i) => (
           <motion.div
@@ -52,30 +52,35 @@ export function SuspenseReveal({ onComplete, durationMs = 2200 }: SuspenseReveal
 
       {/* Progress bar */}
       <div className="w-48 h-1.5 bg-bg-card rounded-full overflow-hidden">
-        <motion.div
-          initial={{ width: '0%' }}
-          animate={{ width: '100%' }}
-          transition={{ duration: durationMs / 1000, ease: 'linear' }}
-          className="h-full bg-accent-amber rounded-full"
-          style={{
-            boxShadow: '0 0 8px var(--color-accent-amber)',
-          }}
-        />
+        {waiting ? (
+          // Indeterminate shimmer when waiting for API
+          <motion.div
+            animate={{ x: ['-100%', '200%'] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="h-full w-1/3 bg-accent-amber rounded-full"
+            style={{ boxShadow: '0 0 8px var(--color-accent-amber)' }}
+          />
+        ) : (
+          // Theatrical fill to 85%
+          <motion.div
+            initial={{ width: '0%' }}
+            animate={{ width: '85%' }}
+            transition={{ duration: durationMs / 1000, ease: [0.4, 0, 0.2, 1] }}
+            className="h-full bg-accent-amber rounded-full"
+            style={{ boxShadow: '0 0 8px var(--color-accent-amber)' }}
+          />
+        )}
       </div>
 
-      {/* Phase text */}
-      <AnimatePresence mode="wait">
-        <motion.p
-          key={phase}
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -5 }}
-          transition={{ duration: 0.2 }}
-          className="text-text-secondary text-sm font-body"
-        >
-          {phases[phase]}
-        </motion.p>
-      </AnimatePresence>
+      {/* Phrase */}
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className="text-text-secondary text-base font-body"
+      >
+        {waiting ? 'Almost there...' : phrase.current}
+      </motion.p>
     </div>
   )
 }

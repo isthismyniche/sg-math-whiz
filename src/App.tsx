@@ -6,6 +6,7 @@ import { HomePage } from './pages/HomePage'
 import { ChallengePage } from './pages/ChallengePage'
 import { SolutionPage } from './pages/SolutionPage'
 import { LeaderboardPage } from './pages/LeaderboardPage'
+import { PastChallengesPage } from './pages/PastChallengesPage'
 
 function AppRoutes() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -28,6 +29,7 @@ function AppRoutes() {
       <Route path="/challenge" element={<ChallengePage />} />
       <Route path="/solution/:id" element={<SolutionPage />} />
       <Route path="/leaderboard" element={<LeaderboardPage />} />
+      <Route path="/past" element={<PastChallengesPage />} />
     </Routes>
   )
 }

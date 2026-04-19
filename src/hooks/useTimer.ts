@@ -44,16 +44,14 @@ export function useTimer() {
   return { elapsedMs, start, stop, reset }
 }
 
-/** Format milliseconds as MM:SS.mmm */
+/** Format milliseconds as M:SS.s (e.g., "1:23.4") for display */
 export function formatTime(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000)
+  const totalSeconds = ms / 1000
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
-  const millis = Math.floor(ms % 1000)
 
-  const mm = String(minutes).padStart(2, '0')
-  const ss = String(seconds).padStart(2, '0')
-  const mmm = String(millis).padStart(3, '0')
-
-  return `${mm}:${ss}.${mmm}`
+  if (minutes > 0) {
+    return `${minutes}:${String(Math.floor(seconds)).padStart(2, '0')}.${Math.floor((seconds % 1) * 10)}`
+  }
+  return `${seconds.toFixed(1)}s`
 }

@@ -1,25 +1,20 @@
 import { motion } from 'framer-motion'
+import { Flame } from 'lucide-react'
 import { formatTime } from '../hooks/useTimer'
-import type { LeaderboardEntry } from '../types'
+import type { StreakLeaderboardEntry } from '../types'
 
-interface LeaderboardTableProps {
-  entries: LeaderboardEntry[]
+interface StreakLeaderboardTableProps {
+  entries: StreakLeaderboardEntry[]
   currentUserId: string | null
 }
 
-const rankColors: Record<number, string> = {
-  1: 'text-yellow-400',
-  2: 'text-gray-300',
-  3: 'text-amber-600',
-}
-
-export function LeaderboardTable({ entries, currentUserId }: LeaderboardTableProps) {
+export function StreakLeaderboardTable({ entries, currentUserId }: StreakLeaderboardTableProps) {
   if (entries.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="text-4xl mb-3">🏆</div>
+        <Flame className="w-10 h-10 text-text-secondary/30 mx-auto mb-3" />
         <p className="text-text-secondary text-base">
-          No one has solved today's challenge yet. Be the first!
+          No active streaks yet. Start yours today!
         </p>
       </div>
     )
@@ -29,7 +24,6 @@ export function LeaderboardTable({ entries, currentUserId }: LeaderboardTablePro
     <div className="space-y-2">
       {entries.map((entry, i) => {
         const isCurrentUser = entry.userId === currentUserId
-        const rankColor = rankColors[entry.rank] ?? 'text-text-secondary'
 
         return (
           <motion.div
@@ -44,7 +38,7 @@ export function LeaderboardTable({ entries, currentUserId }: LeaderboardTablePro
             }`}
           >
             {/* Rank */}
-            <div className={`font-mono text-xl font-bold w-8 text-center ${rankColor}`}>
+            <div className="font-mono text-xl font-bold w-8 text-center text-text-secondary">
               {entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : `#${entry.rank}`}
             </div>
 
@@ -57,14 +51,22 @@ export function LeaderboardTable({ entries, currentUserId }: LeaderboardTablePro
               >
                 {entry.displayName}
                 {isCurrentUser && (
-                  <span className="text-text-secondary text-xs ml-1">(you)</span>
+                  <span className="text-text-secondary text-sm ml-1">(you)</span>
                 )}
               </span>
             </div>
 
-            {/* Time */}
-            <div className="font-mono text-base text-text-secondary tabular-nums">
-              {formatTime(entry.timeMs)}
+            {/* Streak count */}
+            <div className="flex items-center gap-1.5">
+              <Flame className="w-4 h-4 text-streak" />
+              <span className="font-mono text-base font-bold text-streak tabular-nums">
+                {entry.currentStreak}
+              </span>
+            </div>
+
+            {/* Avg time */}
+            <div className="font-mono text-sm text-text-secondary tabular-nums ml-2">
+              {formatTime(entry.avgTimeMs)}
             </div>
           </motion.div>
         )

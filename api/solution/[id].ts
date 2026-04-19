@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { data: question, error: qErr } = await supabase
     .from('questions')
     .select(
-      'id, question_text, date, correct_answer, solution_explanation, source, topic'
+      'id, question_text, date, correct_answer, solution_explanation, source, topic, diagram_url'
     )
     .eq('id', questionId)
     .single()
@@ -49,6 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const response: SolutionResponse = {
     questionId: question.id,
     questionText: question.question_text,
+    diagramUrl: question.diagram_url ?? null,
     date: question.date,
     correctAnswer: Number(question.correct_answer),
     solutionExplanation: question.solution_explanation,

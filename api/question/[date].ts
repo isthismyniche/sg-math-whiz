@@ -1,8 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSupabase } from './_lib/supabase'
-import { authenticateRequest } from './_lib/auth'
-import { getTodaySGT } from './_lib/dates'
-import type { TodayResponse } from '../src/types'
+import { getSupabase } from '../_lib/supabase'
+import { authenticateRequest } from '../_lib/auth'
+import type { TodayResponse } from '../../src/types'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -12,18 +11,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = await authenticateRequest(req, res)
   if (!userId) return
 
-  const supabase = getSupabase()
-  const today = getTodaySGT()
+  const date = req.query.date as string
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' })
+  }
 
-  // Fetch today's question — NEVER include correct_answer
+  const supabase = getSupabase()
+
+  // Fetch question for that date — NEVER include correct_answer
   const { data: question, error: qErr } = await supabase
     .from('questions')
-    .select('id, question_text, date, diagram_url')
-    .eq('date', today)
+    .select('id, question_text, date, source, diagram_url')
+    .eq('date', date)
     .single()
 
   if (qErr || !question) {
-    return res.status(404).json({ error: 'No challenge available for today' })
+    return res.status(404).json({ error: 'No challenge found for this date' })
   }
 
   // Check if user already attempted
@@ -34,21 +37,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .eq('question_id', question.id)
     .single()
 
-  // If already attempted, fetch additional data for result display
+  // If already attempted, fetch enriched data
   let attemptData: TodayResponse['attempt'] | undefined
   if (attempt) {
-    // Fetch correct answer
     const { data: fullQ } = await supabase
       .from('questions')
       .select('correct_answer')
       .eq('id', question.id)
       .single()
 
-    // Compute streaks
     const { data: currentStreak } = await supabase.rpc('compute_current_streak', { p_user_id: userId })
     const { data: bestStreak } = await supabase.rpc('compute_best_streak', { p_user_id: userId })
 
-    // Compute rank if correct
     let rank: number | undefined
     if (attempt.is_correct) {
       const { count } = await supabase
