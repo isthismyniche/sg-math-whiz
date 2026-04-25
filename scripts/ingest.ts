@@ -146,16 +146,17 @@ async function ingestPdf(
       const questions = await extractPage(model, base64)
       allQuestions.push(...questions)
       console.log(` ${questions.length} questions`)
+
+      // Only advance the resume pointer on success
+      await writeFile(outPath, JSON.stringify({
+        source, filename, questions: allQuestions,
+        lastPageProcessed: pageNum,
+        complete: false,
+      }, null, 2))
     } catch (err: any) {
       console.log(` ERROR: ${err?.message?.split('\n')[0] ?? err}`)
+      // Do not advance lastPageProcessed — this page will be retried on next run
     }
-
-    // Save progress after every page
-    await writeFile(outPath, JSON.stringify({
-      source, filename, questions: allQuestions,
-      lastPageProcessed: pageNum,
-      complete: false,
-    }, null, 2))
 
     await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS))
   }
