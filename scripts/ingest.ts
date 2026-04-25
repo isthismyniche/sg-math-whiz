@@ -21,9 +21,10 @@ import { join, basename, extname } from 'path'
 const PAPERS_DIR = join(process.cwd(), 'data/papers')
 const OUTPUT_DIR = join(process.cwd(), 'data/extracted')
 
-// 3 concurrent pages, 15s gap between batches → ~12 RPM (under 15 RPM free limit)
-const BATCH_SIZE = 3
-const BATCH_DELAY_MS = 15_000
+// Sequential with 5s between requests → 12 RPM (well under 15 RPM free limit)
+// Sequential avoids burst-rate-limiting; 5s gap is conservative and safe
+const REQUEST_DELAY_MS = 5_000
+const MAX_RETRIES = 3
 
 interface ExtractedQuestion {
   number: number
@@ -87,12 +88,26 @@ async function extractPage(
   model: ReturnType<InstanceType<typeof GoogleGenerativeAI>['getGenerativeModel']>,
   base64: string,
 ): Promise<ExtractedQuestion[]> {
-  const result = await model.generateContent([
-    { inlineData: { data: base64, mimeType: 'image/png' } },
-    PROMPT,
-  ])
-  const parsed = JSON.parse(result.response.text()) as { questions: ExtractedQuestion[] }
-  return parsed.questions ?? []
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const result = await model.generateContent([
+        { inlineData: { data: base64, mimeType: 'image/png' } },
+        PROMPT,
+      ])
+      const parsed = JSON.parse(result.response.text()) as { questions: ExtractedQuestion[] }
+      return parsed.questions ?? []
+    } catch (err: any) {
+      const is429 = err?.status === 429 || err?.message?.includes('429')
+      if (is429 && attempt < MAX_RETRIES) {
+        const delay = attempt * 30_000 // 30s, 60s backoff
+        process.stdout.write(` [rate limit, retry in ${delay / 1000}s]`)
+        await new Promise((r) => setTimeout(r, delay))
+      } else {
+        throw err
+      }
+    }
+  }
+  return []
 }
 
 async function ingestPdf(
@@ -118,51 +133,32 @@ async function ingestPdf(
   } catch { /* fresh start */ }
 
   let pageNum = 0
-  let batch: Array<{ pageNum: number; base64: string }> = []
   const document = await pdf(pdfPath, { scale: 2 })
-
-  const flushBatch = async () => {
-    if (batch.length === 0) return
-
-    const range = `${batch[0].pageNum}–${batch[batch.length - 1].pageNum}`
-    process.stdout.write(`  Pages ${range}...`)
-
-    const results = await Promise.allSettled(
-      batch.map(({ base64 }) => extractPage(model, base64))
-    )
-
-    let count = 0
-    for (const [i, r] of results.entries()) {
-      if (r.status === 'fulfilled') {
-        allQuestions.push(...r.value)
-        count += r.value.length
-      } else {
-        process.stdout.write(` [p${batch[i].pageNum} err]`)
-      }
-    }
-    console.log(` ${count} questions`)
-
-    // Save progress after every batch
-    await writeFile(outPath, JSON.stringify({
-      source, filename, questions: allQuestions,
-      lastPageProcessed: batch[batch.length - 1].pageNum,
-      complete: false,
-    }, null, 2))
-
-    batch = []
-    await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
-  }
 
   for await (const pageImage of document) {
     pageNum++
     if (pageNum < resumeFromPage) continue
 
-    batch.push({ pageNum, base64: Buffer.from(pageImage).toString('base64') })
+    process.stdout.write(`  Page ${pageNum}...`)
+    const base64 = Buffer.from(pageImage).toString('base64')
 
-    if (batch.length >= BATCH_SIZE) await flushBatch()
+    try {
+      const questions = await extractPage(model, base64)
+      allQuestions.push(...questions)
+      console.log(` ${questions.length} questions`)
+    } catch (err: any) {
+      console.log(` ERROR: ${err?.message?.split('\n')[0] ?? err}`)
+    }
+
+    // Save progress after every page
+    await writeFile(outPath, JSON.stringify({
+      source, filename, questions: allQuestions,
+      lastPageProcessed: pageNum,
+      complete: false,
+    }, null, 2))
+
+    await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS))
   }
-
-  await flushBatch() // flush any remaining pages
 
   // Deduplicate: keep the last-seen entry for each question number
   // (later pages sometimes have more complete versions of split questions)
@@ -201,7 +197,7 @@ async function main() {
   }
 
   console.log(`Found ${files.length} PDF(s) in data/papers/`)
-  console.log(`Processing ${BATCH_SIZE} pages concurrently with ${BATCH_DELAY_MS / 1000}s delay between batches\n`)
+  console.log(`Processing 1 page at a time with ${REQUEST_DELAY_MS / 1000}s gap (~12 RPM, under free tier limit)\n`)
 
   let totalQ = 0, textOnly = 0, withDiagram = 0
 
