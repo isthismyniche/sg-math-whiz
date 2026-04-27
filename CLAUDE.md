@@ -68,7 +68,7 @@ Fonts: `font-display` (Instrument Serif), `font-body` (DM Sans), `font-mono` (Je
 - **`correct_answer` is never sent to the frontend before submission** — never add it to API responses from `today.ts` or `question/[date].ts`
 - **All dates are Singapore time (SGT, UTC+8)** — use `getTodaySGT()` from `api/_lib/dates.ts`
 - **Supabase client**: service role (bypasses RLS) for `api/` and scripts; anon key for frontend
-- **Auth**: username stored in localStorage, passed as `x-user-id` header — see `api/_lib/auth.ts`
+- **Auth**: Google OAuth via Supabase Auth (`supabase.auth.signInWithOAuth({ provider: 'google' })`), with a username-only fallback. On Google return, frontend posts the access token to `api/auth/google-signin.ts`, which verifies and upserts a `users` row keyed on `google_sub`. Username-only users go through `api/register.ts`. `userId` + `displayName` live in localStorage; `x-user-id` header authenticates subsequent requests via `api/_lib/auth.ts`. Frontend wiring: `src/context/AuthContext.tsx`.
 
 ## Question ingestion pipeline
 
@@ -95,7 +95,7 @@ UPDATE questions SET date = 'YYYY-MM-DD' WHERE question_text = '...' ;
 
 **`questions`**: `id`, `date` (nullable = unscheduled), `question_text`, `correct_answer`, `solution_explanation`, `source`, `topic`, `difficulty`, `diagram_url`, `created_at`
 
-**`users`**: `id` (matches localStorage userId), `display_name`, `created_at`
+**`users`**: `id` (matches localStorage userId), `display_name`, `google_sub` (nullable; set on Google sign-in, NULL for username-only users), `created_at`
 
 **`attempts`**: `id`, `user_id`, `question_id`, `submitted_answer`, `is_correct`, `time_ms`, `is_daily`, `created_at`
 
