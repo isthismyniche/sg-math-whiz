@@ -1,5 +1,5 @@
 /**
- * Ingest: extract questions + difficulty scores from PSLE exam PDFs using Claude Haiku.
+ * Ingest: extract questions + difficulty scores from PSLE exam PDFs using Gemini Flash (free).
  *
  * Usage: npx tsx scripts/ingest.ts
  *
@@ -7,12 +7,15 @@
  * Reads PDFs from data/papers/, processes pages sequentially,
  * and outputs one JSON per paper to data/extracted/.
  *
+ * Free tier: 1,500 requests/day, 15 RPM — safe to rerun as many times as needed.
+ * Get a free API key at https://aistudio.google.com/app/apikey
+ * Add to .env: GOOGLE_AI_API_KEY=your_key_here
+ *
  * Resumable: re-running picks up from the last successfully processed page.
- * Requires: ANTHROPIC_API_KEY in .env
  */
 
 import 'dotenv/config'
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { pdf } from 'pdf-to-img'
 import { readdir, readFile, writeFile, mkdir } from 'fs/promises'
 import { join, basename, extname } from 'path'
@@ -20,8 +23,8 @@ import { join, basename, extname } from 'path'
 const PAPERS_DIR = join(process.cwd(), 'data/papers')
 const OUTPUT_DIR = join(process.cwd(), 'data/extracted')
 
-// 3s between requests → ~20 RPM, well within Claude Haiku tier-1 limits
-const REQUEST_DELAY_MS = 3_000
+// Sequential with 5s between requests → 12 RPM (well under 15 RPM free limit)
+const REQUEST_DELAY_MS = 5_000
 const MAX_RETRIES = 3
 
 interface ExtractedQuestion {
@@ -64,33 +67,25 @@ Respond with ONLY a JSON array, no markdown fencing:
 [{"number": 1, "text": "...", "topic": "...", "has_diagram": false, "difficulty_score": 7, "difficulty_reason": "..."}, ...]`
 
 async function extractPage(
-  client: Anthropic,
+  model: ReturnType<InstanceType<typeof GoogleGenerativeAI>['getGenerativeModel']>,
   base64: string,
 ): Promise<ExtractedQuestion[]> {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const response = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4096,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64 } },
-              { type: 'text', text: PROMPT },
-            ],
-          },
-        ],
-      })
-      const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
+      const result = await model.generateContent([
+        { inlineData: { data: base64, mimeType: 'image/png' } },
+        PROMPT,
+      ])
+      const text = result.response.text()
       const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-      return JSON.parse(cleaned) as ExtractedQuestion[]
+      // Gemini sometimes returns an object wrapper; handle both [] and { questions: [] }
+      const parsed = JSON.parse(cleaned)
+      return Array.isArray(parsed) ? parsed : (parsed.questions ?? [])
     } catch (err: any) {
-      const isOverload = err?.status === 529 || err?.message?.includes('overloaded')
       const isRateLimit = err?.status === 429 || err?.message?.includes('429')
-      if ((isOverload || isRateLimit) && attempt < MAX_RETRIES) {
+      if (isRateLimit && attempt < MAX_RETRIES) {
         const delay = attempt * 30_000
-        process.stdout.write(` [retry in ${delay / 1000}s]`)
+        process.stdout.write(` [rate limit, retry in ${delay / 1000}s]`)
         await new Promise((r) => setTimeout(r, delay))
       } else {
         throw err
@@ -101,7 +96,7 @@ async function extractPage(
 }
 
 async function ingestPdf(
-  client: Anthropic,
+  model: ReturnType<InstanceType<typeof GoogleGenerativeAI>['getGenerativeModel']>,
   pdfPath: string,
   outPath: string,
 ): Promise<ExtractedPaper> {
@@ -132,20 +127,21 @@ async function ingestPdf(
     const base64 = Buffer.from(pageImage).toString('base64')
 
     try {
-      const questions = await extractPage(client, base64)
+      const questions = await extractPage(model, base64)
       allQuestions.push(...questions)
       console.log(` ${questions.length} questions`)
-
-      // Only advance the resume pointer on success
-      await writeFile(outPath, JSON.stringify({
-        source, filename, questions: allQuestions,
-        lastPageProcessed: pageNum,
-        complete: false,
-      }, null, 2))
     } catch (err: any) {
-      console.log(` ERROR: ${err?.message?.split('\n')[0] ?? err}`)
-      // Do not advance lastPageProcessed — this page will be retried on next run
+      // Log and skip — do not crash the whole PDF over one bad page
+      console.log(` SKIP (${err?.message?.split('\n')[0] ?? err})`)
     }
+
+    // Always advance the resume pointer, even on error — a permanently broken page
+    // should not block all subsequent pages on every re-run
+    await writeFile(outPath, JSON.stringify({
+      source, filename, questions: allQuestions,
+      lastPageProcessed: pageNum,
+      complete: false,
+    }, null, 2))
 
     await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS))
   }
@@ -166,13 +162,21 @@ async function ingestPdf(
 }
 
 async function main() {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.GOOGLE_AI_API_KEY
   if (!apiKey) {
-    console.error('Error: ANTHROPIC_API_KEY is required in .env')
+    console.error('Error: GOOGLE_AI_API_KEY is required.')
+    console.error('Get a free key at https://aistudio.google.com/app/apikey')
+    console.error('Then add to .env:  GOOGLE_AI_API_KEY=your_key_here')
     process.exit(1)
   }
 
-  const client = new Anthropic({ apiKey })
+  const genAI = new GoogleGenerativeAI(apiKey)
+  // No responseSchema — parse JSON from text to avoid silent empty arrays
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    generationConfig: { temperature: 0 },
+  })
+
   await mkdir(OUTPUT_DIR, { recursive: true })
 
   const files = (await readdir(PAPERS_DIR)).filter((f) => f.toLowerCase().endsWith('.pdf'))
@@ -189,7 +193,7 @@ async function main() {
   for (const file of files) {
     console.log(`Processing: ${basename(file, extname(file))}`)
     const outPath = join(OUTPUT_DIR, `${basename(file, extname(file))}.json`)
-    const result = await ingestPdf(client, join(PAPERS_DIR, file), outPath)
+    const result = await ingestPdf(model, join(PAPERS_DIR, file), outPath)
 
     await writeFile(outPath, JSON.stringify({ ...result, complete: true }, null, 2))
 
