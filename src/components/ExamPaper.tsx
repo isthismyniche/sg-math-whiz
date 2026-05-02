@@ -72,11 +72,11 @@ export function ExamPaper({
 
             {/* Diagram (if present) */}
             {diagramUrl && (
-              <div className="mt-5 mb-1 flex justify-center">
+              <div className="mt-4 -mx-6 sm:-mx-8">
                 <img
                   src={diagramUrl}
                   alt="Question diagram"
-                  className="max-w-full rounded border border-[#1a1a1a]/10"
+                  className="w-full"
                   style={{ maxHeight: '840px', objectFit: 'contain' }}
                 />
               </div>

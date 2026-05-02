@@ -116,11 +116,11 @@ export function SolutionPage() {
             </div>
           </div>
           {solution.diagramUrl && (
-            <div className="mt-5 flex justify-center">
+            <div className="mt-4 -mx-6 sm:-mx-8">
               <img
                 src={solution.diagramUrl}
                 alt="Question diagram"
-                className="max-w-full rounded border border-[#1a1a1a]/10"
+                className="w-full"
                 style={{ maxHeight: '840px', objectFit: 'contain' }}
               />
             </div>
