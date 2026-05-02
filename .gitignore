@@ -31,9 +31,6 @@ logs
 *.log
 npm-debug.log*
 
-# Question ingestion data (PDFs, extracted JSON, curated, review files, diagrams)
-data/papers/
-data/extracted/
-data/curated/
-data/review/
-data/diagrams/
+# Question ingestion data (image-based pipeline; nothing in data/ should be committed)
+data/pending-questions/
+data/imported-questions/

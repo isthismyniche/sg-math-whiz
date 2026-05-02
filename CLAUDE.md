@@ -26,10 +26,7 @@ api/                    Vercel serverless functions
   past-questions.ts     GET list of past challenges
   leaderboard/          Streak + daily leaderboards
 scripts/                Question ingestion pipeline (run with npx tsx)
-  extract-questions.ts  PDF → JSON via Claude Vision (resumable)
-  curate-questions.ts   Rank difficulty, keep top %
-  generate-review.ts    JSON → TSV for PO review
-  import-questions.ts   TSV → Supabase (uploads diagrams to Storage)
+  ingest-images.ts      Interactive CLI: image + answer → Supabase
   schedule-questions.ts Assign dates to unscheduled questions
 src/
   pages/                ChallengePage, SolutionPage, HomePage, PastChallengesPage, LeaderboardPage
@@ -38,11 +35,8 @@ src/
   lib/                  api.ts, storage.ts (localStorage helpers)
 supabase/migrations/    SQL migrations (applied manually via Supabase SQL editor)
 data/                   All gitignored — local only
-  papers/               Source PDFs
-  extracted/            Per-paper JSON from extraction
-  curated/              curated-questions.json (top % by difficulty)
-  review/               questions-for-review.tsv (PO fills answers here)
-  diagrams/             Source images for diagram questions
+  pending-questions/    Question screenshots awaiting ingest
+  imported-questions/   Question screenshots already imported (kept for reference)
 ```
 
 ## Design system
@@ -72,23 +66,22 @@ Fonts: `font-display` (Instrument Serif), `font-body` (DM Sans), `font-mono` (Je
 
 ## Question ingestion pipeline
 
+Image-based. Each question is a single screenshot (PNG/JPEG); the image *is* the question — `question_text` in the DB just holds optional "added context" (e.g. "Answer part (b) only") or empty string.
+
 ```
-data/papers/ → extract → data/extracted/ → curate → data/curated/
-→ generate-review → data/review/questions-for-review.tsv
-→ PO fills: correct_answer, solution_explanation, diagram_filename, approved (Y/N)
-→ import → Supabase (diagram uploaded to Storage, date = NULL)
-→ schedule → dates assigned
+data/pending-questions/<file>.png
+  → npx tsx scripts/ingest-images.ts   (interactive CLI: prompts answer + metadata,
+                                         uploads image with UUID name to Storage,
+                                         inserts row with date = NULL,
+                                         moves local file to imported-questions/)
+  → npx tsx scripts/schedule-questions.ts (assigns dates with topic diversity)
 ```
 
-TSV columns: `source`, `number`, `question_text`, `topic`, `difficulty_score`, `difficulty_reason`, `correct_answer`, `solution_explanation`, `difficulty`, `diagram_filename`, `approved`
-
-To add questions manually: add rows directly to the TSV with all fields filled, then run import.
-
-For diagram questions: drop image into `data/diagrams/<filename>.png`, set `diagram_filename` in TSV. Import uploads to Supabase Storage and stores the public URL in `diagram_url`.
+Question content stays out of the public Git repo: both `data/pending-questions/` and `data/imported-questions/` are gitignored. The bucket is public but uploads use UUID filenames to prevent enumeration.
 
 To test a specific question today in localhost, update its date directly in Supabase SQL editor:
 ```sql
-UPDATE questions SET date = 'YYYY-MM-DD' WHERE question_text = '...' ;
+UPDATE questions SET date = 'YYYY-MM-DD' WHERE id = '...' ;
 ```
 
 ## Supabase schema (key tables)
